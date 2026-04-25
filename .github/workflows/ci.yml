@@ -19,10 +19,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r backend/requirements.txt
+          pip install -r blog_api/project/requirements.txt
           pip install pytest
 
       - name: Run tests
         run: |
           echo "Running tests..."
-          pytest backend || echo "No tests yet"
+          pytest blog_api/project/tests || echo "No tests yet"
