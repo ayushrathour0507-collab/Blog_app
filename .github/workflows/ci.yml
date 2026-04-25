@@ -1,77 +1,24 @@
-docker-compose up --buildname: CI Pipeline
+name: CI Pipeline
 
 on:
   push:
-    branches: [ main, develop, '**' ]
-  pull_request:
-    branches: [ main, develop ]
+    branches: ["main"]
 
 jobs:
-  test-backend:
+  test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Set up Python 3.11
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('blog_api/project/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      
-      - name: Install dependencies
-        run: |
-          cd blog_api/project
-          pip install -r requirements.txt
-      
-      - name: Run tests
-        run: |
-          cd blog_api/project
-          pytest tests/ -v --tb=short
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_blog
-          SECRET_KEY: test-secret-key
-      
-      - name: Upload test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: blog_api/project/tests/
+          python-version: 3.11
 
-  test-frontend:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: blog_ui/package-lock.json
-      
       - name: Install dependencies
-        run: |
-          cd blog_ui
-          npm ci
-      
-      - name: Run linter
-        run: |
-          cd blog_ui
-          npm run lint
-      
-      - name: Build frontend
-        run: |
-          cd blog_ui
-          npm run build
+        run: pip install -r backend/requirements.txt
+
+      - name: Run tests
+        run: pytest backend
