@@ -46,8 +46,302 @@ blog_app/
 │   │   └── api/
 │   ├── package.json
 │   └── vite.config.js
-└── DEPLOYMENT.md      # Deployment instructions
+├── docker-compose.yml # Docker orchestration
+├── .env.example       # Environment variables template
+└── .github/workflows/ # CI/CD pipeline
 ```
+
+---
+
+## 🚀 Quick Start (Docker Compose)
+
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd blog-app
+
+# 2. Copy environment variables
+cp .env.example .env
+
+# 3. Start all services
+docker-compose up --build
+
+# 4. Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# API Docs: http://localhost:8000/docs
+```
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        F[Frontend<br/>React + Vite<br/>:3000]
+    end
+    
+    subgraph "API Layer"
+        B[Backend<br/>FastAPI + Uvicorn<br/>:8000]
+    end
+    
+    subgraph "Data Layer"
+        DB[(PostgreSQL<br/>:5432)]
+    end
+    
+    F -->|HTTP| B
+    B -->|SQL| DB
+```
+
+---
+
+## 📋 Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `POSTGRES_USER` | Database username | `bloguser` |
+| `POSTGRES_PASSWORD` | Database password | `changeme` |
+| `POSTGRES_DB` | Database name | `blogdb` |
+| `DATABASE_URL` | Full database connection string | `postgresql://bloguser:changeme@db:5432/blogdb` |
+| `SECRET_KEY` | JWT secret key | `your-secret-key-change-in-production` |
+| `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000,http://localhost:5173` |
+| `VITE_API_URL` | Backend API URL | `http://localhost:8000` |
+
+### DATABASE_URL Format
+
+```
+postgresql://username:password@hostname:port/database_name
+```
+
+**Important**: Use the Docker service name (`db`) as hostname, NOT `localhost` or `127.0.0.1`.
+
+---
+
+## 🐳 Docker Commands
+
+### Build & Run Full Stack
+
+```bash
+# Build all containers
+docker-compose build
+
+# Start all services in detached mode
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+```
+
+### Individual Service Commands
+
+```bash
+# Backend only
+cd blog_api/project
+docker build -t blog-backend .
+docker run -p 8000:8000 --env-file ../../.env blog-backend
+
+# Frontend only
+cd blog_ui
+docker build -t blog-frontend .
+docker run -p 3000:80 blog-frontend
+```
+
+---
+
+## 🔧 Development Commands
+
+### Backend
+
+```bash
+cd blog_api/project
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run development server
+uvicorn main:app --reload
+
+# Run tests
+pytest tests/ -v
+```
+
+### Frontend
+
+```bash
+cd blog_ui
+
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+---
+
+## ⚙️ CI/CD Pipeline
+
+The project includes GitHub Actions workflow for continuous integration.
+
+### Pipeline Stages
+
+```mermaid
+flowchart LR
+    A[Checkout] --> B[Setup Python]
+    B --> C[Install Dependencies]
+    C --> D[Run Tests]
+    D --> E{Tests Pass?}
+    E -->|Yes| F[Build Frontend]
+    E -->|No| G[Fail]
+    F --> H[Complete]
+```
+
+### Workflow File
+
+- **Location**: `.github/workflows/ci.yml`
+- **Triggers**: Push to any branch, Pull requests to main/develop
+
+### Running CI Locally
+
+```bash
+# Simulate CI environment
+docker run -it python:3.11-slim bash
+pip install -r requirements.txt
+pytest tests/
+```
+
+---
+
+## 🔨 Break/Fix Demo
+
+### How to Intentionally Break CI
+
+```bash
+# Method 1: Break tests
+echo "assert False" >> blog_api/project/tests/test_api.py
+git add . && git commit -m "break tests" && git push
+
+# Method 2: Break build
+echo "invalid syntax" >> blog_ui/src/App.jsx
+git add . && git commit -m "break build" && git push
+
+# Method 3: Break Dockerfile
+echo "INVALID" > blog_api/project/Dockerfile
+```
+
+### How to Fix CI
+
+```bash
+# 1. Check workflow run logs
+# Navigate to: GitHub > Actions > Failed Run > Logs
+
+# 2. Common fixes:
+# - Test failure: Fix test assertions
+# - Build failure: Check syntax errors
+# - Dependency issue: Update package versions
+
+# 3. Verify fix
+git checkout -- .
+git log --oneline -5
+git diff HEAD~1
+```
+
+### Logs to Check
+
+| Log Location | What to Look For |
+|--------------|------------------|
+| GitHub Actions | `Run pytest` output, `npm run build` errors |
+| Docker | `docker-compose logs backend`, container startup errors |
+| Backend | `/health` endpoint, database connection errors |
+| Browser Console | CORS errors, 404/500 status codes |
+
+---
+
+## 🛠️ Common Errors & Fixes
+
+### 1. Database Connection Issue
+
+**Error**: `could not connect to server: Connection refused`
+
+**Cause**: Using `localhost` instead of Docker service name
+
+**Fix**:
+```yaml
+# Wrong
+DATABASE_URL=postgresql://user:pass@localhost:5432/blogdb
+
+# Correct
+DATABASE_URL=postgresql://user:pass@db:5432/blogdb
+```
+
+### 2. CORS Issue
+
+**Error**: `Access to fetch at 'http://localhost:8000' from origin 'http://localhost:3000' has been blocked by CORS policy`
+
+**Fix**:
+```python
+# In main.py, ensure CORS_ORIGINS includes frontend URL
+os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
+```
+
+### 3. Port Mismatch
+
+**Error**: `bind: address already in use`
+
+**Fix**:
+```bash
+# Check what's using the port
+netstat -ano | findstr "8000"
+
+# Kill process
+taskkill /PID <PID> /F
+
+# Or use different port in docker-compose.yml
+ports:
+  - "8001:8000"
+```
+
+### 4. Docker Build Failure
+
+**Error**: `failed to solve with frontend dockerfile`
+
+**Fix**:
+```bash
+# Clear Docker cache
+docker system prune -a
+
+# Rebuild without cache
+docker-compose build --no-cache
+
+# Check Dockerfile syntax
+docker build -t test . -f Dockerfile
+```
+
+---
+
+## 📄 File Reference
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Orchestrates all services |
+| `blog_api/project/Dockerfile` | Backend container image |
+| `blog_ui/Dockerfile` | Frontend container image |
+| `blog_ui/nginx.conf` | Nginx configuration for serving SPA |
+| `.env.example` | Environment variables template |
+| `.github/workflows/ci.yml` | GitHub Actions CI pipeline |
+
+---
+
+## 📄 License
+
+MIT License - See LICENSE file for details
 
 ## Setup and Installation
 
